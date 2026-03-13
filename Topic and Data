@@ -1,0 +1,27 @@
+Topic: The Child Tax Credit and Household Outcomes
+
+Motivation: The Child Tax Credit is intended to ease the financial burden of families
+and lower the cost of raising children. Though there is ranging consensus on its effectiveness
+as well as the credit's impacts on labor responses within the household. Further research on the
+CTC may befenit to increase the credit's effectiveness and how it shapes household dynamics.
+
+Potential Research Questions:
+- What is the effect of the CTC on women's LFPR?
+- What is the effect of the CTC on unemployment? Women's unemployment?
+- What is the effect of the ECTC on women's LFPR?
+- What is the effect of the ECTC on unemployment? Women's unemployment?
+
+Datasets:
+
+BLS Local Area Uunemployment Statistics
+1976 - 2025 Labor Force Participation Rates by state 
+https://www.bls.gov/lau/data.htm
+
+American Community Survey Employment Status and LFPR by age, race, education, 
+poverty status, and gender -if female with own children under 18, 
+state estimates from 2010 - 2024
+https://www.bls.gov/cps/demographics.htm
+
+Include the source URL, what kind of variables are contained in each dataset 
+(no need for a full list), the timespan and spatial coverage of the datasets, 
+and how the datasets are related to each other.
