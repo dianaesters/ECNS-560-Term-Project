@@ -1,0 +1,151 @@
+---
+title: "Project Report"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include= FALSE, echo = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(tidyverse)
+dfCTC = read_csv("DAHWpCTC.csv")
+
+```
+
+# Labor Supply and the Child Tax Credit
+
+### Topic and Motivation
+
+I explore the trends of the adoption the Child Tax Credit and labor supply from 2005 to 2026. The Child Tax Credit is intended to ease the financial burden of families and lower the cost of raising children. Though there is ranging consensus on its effectiveness as well as the credit's impacts on labor responses within the household. Further research on the
+CTC may benefit to increase the credit's effectiveness and how it shapes household dynamics. 
+
+Here I explore question surrounding how do employment and labor supply responses change during the adoption and explansion of the CTC? Are these trends different among mothers who receive the credits and mothers who do not? How do these trends vary by age? race? income? and education?
+
+### Data
+
+My primary data source comes from the Current Population Core Survey and Annual Social and Economic Supplement. The CPS ASEC provides longitudinal data for individuals and households. My main variables of interest including, individual employment status, labor status, and total CTC and ACTC received come from this source and are at the individual level.  
+
+Additionally, I rely on posted U.S legislative policy and IRS postings to create my secondary data source. Here I collect information on federal CTC and ACTC changes including maximum credit values, minimum earnings thresholds, refundability, maximum refund values, and maximum earnings for single individual filers and married individuals filing jointly. These policy changes are implemented at the country level. 
+
+Though the CTC was enacted in 1997, I restrict my analysis to the years 2005 - 2025. This is due to data availability for tracking how much an individual received from the CTC and the ACTC. Additionally, for any individuals that failed to report their earnings from the CTC or ACTC, i.e they were Not in Universe, I also excluded them from the sample. Variables including welfare income, received the earned income tax credit, and total income also had NIU/NA values, though when excluding the individuals that held NIU values for CTC or ACTC, they were excluded as well. If individuals had missing values for employment or labor status they were also excluded. These decisions were dependent on that I could not safely assume an NA/NIU value would equate to 0. This is especially the case for the credits as both individuals that qualified for the credit based on number of children and personal income and those that did not both hold NA/NIU values.  Any variables that had excess missing values and were not exceedingly relevant to analysis, such as migration status 5 years ago and receiving medicare or medicaid were also excluded. The District of Columbia was excluded as well for data availability purposes.
+
+In analysis and visualizations, transformations on all incomes, total income, household income, welfare income, and adjusted gross income are applied to better capture their distribution, this also helps to for any potential analysis of elasticities. Also to capture any diminishing returns on income with age, I include an age squared term. 
+
+### Visualizations
+
+#### Figure 1: Employment Trends for Women with Children, CTC vs. No CTC
+
+```{r, Figure 1, message = FALSE, warning = FALSE}
+
+dfCTC |>
+  filter(sex == 2, n_child > 0) |>
+  mutate(ctc_any = (ctc > 0 | actc > 0)) |>
+  group_by(year, ctc_any) |>
+  summarize(emp_rate = mean(employed, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = year, y = emp_rate, color = ctc_any)) +
+  geom_line(size = 1.2) +
+  labs(title = "Employment Trends for Women with Children",
+       subtitle = "By CTC/ACTC Receipt",
+       x = "Year",
+       y = "Employment Rate",
+       color = "Receives CTC") +
+  scale_color_manual(values = c("lightgreen", "red"),
+                     labels = c("Yes","No")) +
+  theme_minimal()
+
+```
+
+Figure 1 is restricted in sample to only women with children. It then charts the trends for women with children receiving the Child Tax Credit (in green) alongside women with children not receiving the Child Tax Credit (in red). The graph shows large differences in baseline employment for the two groups, though trends in their employment rate do not seem to vary drastically. There are some larger tail end differences in employment rates between the two groups, beginning around 2022. 
+
+#### Figures 2 and 3: Employment and CTC Generosity; Employment and CTC Generosity for Mothers Recieving the CTC
+
+```{r, Figures 2 and 3, message = FALSE, warning = FALSE}
+
+CTCmoms = dfCTC |>
+  filter(sex == 2, n_child > 0, ctc > 0 | actc > 0)
+
+dfCTC |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot(aes(x = year)) +
+  geom_line(aes(y = emp_rate, color = "Employment Rate")) +
+  geom_line(aes(y = avg_ctc / max(avg_ctc), color = "CTC (scaled)")) +
+  labs(title = "Employment and CTC Generosity",
+       y = "Scaled Values", color = "") +
+  theme_minimal()
+#For moms receiving CTC
+CTCmoms |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot(aes(x = year)) +
+  geom_line(aes(y = emp_rate, color = "Recipient Mothers Employment Rate")) +
+  geom_line(aes(y = avg_ctc / max(avg_ctc), color = "CTC (scaled)")) +
+  labs(title = "Employment and CTC Generosity for Mothers Recieving the CTC",
+       y = "Scaled Values", color = "") +
+  theme_minimal()
+
+```
+
+Figures 2 and 3 compare employment rates to scaled changes in the maximum value of the CTC. Because values of the CTC are scaled, the figure does not discuss changes in magnitude, but trends in the two variables together. For both the entire sample and women with children recieving the CTC, employment dipped at the credit's highest generosity level. Note, the CTC was expanded the most in 2021 in response to the COVID-19 pandemic, where employment was already dipping regardless to changes in the CTC. 
+
+
+#### Figures 4 and 5: Employment Trends Surrounding CTC Expansions; Employment Trends for Women recieving the CTC around Expansions
+
+```{r, Figures 4 and 5, message = FALSE, warning = FALSE}
+
+#Employment changes surrounding recent CTC expansions
+#For entire sample
+dfCTC |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot (aes(x = year, y = emp_rate)) +
+  geom_line() + geom_vline(aes(xintercept = 2018, color = "TCJA"),
+             linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = 2021, color = "ARPA"),
+             linetype = "dashed", size = 1) +
+   scale_color_manual(values = c("TCJA" = "darkred",
+                                "ARPA" = "lightblue"),
+                     name = "Policy Change") +
+   labs(title = "Employment Trends around CTC Expansions", 
+        y = "Employment Rate") +
+  theme_minimal() +
+  theme(legend.position = "right")
+#For mothers receiving credit
+CTCmoms |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+  ggplot (aes(x = year, y = emp_rate)) +
+  geom_line() + geom_vline(aes(xintercept = 2018, color = "TCJA"),
+                           linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = 2021, color = "ARPA"),
+             linetype = "dashed", size = 1) +
+  scale_color_manual(values = c("TCJA" = "darkred",
+                                "ARPA" = "lightblue"),
+                     name = "Policy Change") +
+  labs(title = "Employment Trends for Women Recieving the CTC around Expansions", 
+       y = "Employment Rate") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+
+Figures 4 and 5 consider two major expansions to the CTC, the Tax Cuts and Jobs Act and the American Rescue Plan Act. The 2017 TCJA increased the maximum value to \$2000. The 2021 ARPA increased the maximum value to \$3,600 per child under the age of 6, and to \$3,000 for children between 6 - 17. The ARPA also made the credit fully refundable. Though, the ARPA changes only lasted througout tax year 2021 in response to the COVID-19 pandemic. Figure 4 displays a decline in employment rates within the sample following the 2017 expansion and a rise in employment following the 2021 expansion. Conversely, Figure 5 shows an increase in employment rates following the 2017 expansion and a sharp decline in employment rates after the 2021 expansion when considering mothers recieving the CTC. Employment rates have a sharp increase around 2022, the year following expansion, in this period the expansion is no longer enacted.
+
+
+
+
+
