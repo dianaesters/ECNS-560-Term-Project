@@ -6,9 +6,10 @@
 library(ipumsr)
 library(readxl)
 library(dplyr)
-#Load IPUMS and excel data
-ddi = read_ipums_ddi("cps_00004.xml")
-dfCTCraw = read_ipums_micro(ddi)
+#Load IPUMS and excel data (IPUMS commented out for data conversion to r)
+#ddi = read_ipums_ddi("cps_00004.xml")
+#dfCTCraw = read_ipums_micro(ddi)
+dfCTCraw = readRDS("dfCTCraw.rds")
 excel_df = read_excel("fed_ctc_panel.xlsx")
 
 # Cleaning CPS ASEC ---------------------
