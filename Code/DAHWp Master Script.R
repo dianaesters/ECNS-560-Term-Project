@@ -193,6 +193,11 @@ cleanCTC = cleanCTC |>
 cleanCTC = cleanCTC |>
   mutate(age_sq = age^2)
 
+#Save data ------------------------------
+#Commented out for replication. If want to save: Choose wanted data format, select own document name, run without comment status
+#write.csv(cleanCTC, "DAHWpCTC.csv", row.names = FALSE)
+#save(cleanCTC, file = "DAHWpCTC.RData", compress = "xz")
+
 # Generate Visualizations
 
 #Define data frame for women with children receiving the credit
