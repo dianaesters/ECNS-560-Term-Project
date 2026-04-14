@@ -203,9 +203,6 @@ cleanCTC = cleanCTC |>
 #Define data frame for women with children receiving the credit
 CTCmoms = cleanCTC |>
   filter(sex == 2, n_child > 0, ctc > 0 | actc > 0)
-freq(CTCmoms$ctc)
-ggplot(CTCmoms, aes(x = year, y = ctc)) + geom_point()
-ggplot(CTCmoms, aes(x = year, y = actc)) + geom_point()
 
 #Employment trends for women with children when receiving the CTC vs not receiving CTC
 cleanCTC |>
