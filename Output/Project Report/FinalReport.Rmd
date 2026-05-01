@@ -1,0 +1,429 @@
+---
+title: "Report"
+author: "Diana Esters"
+output: html_document
+---
+
+```{r setup, include= FALSE, echo = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(tidyverse)
+dfCTC = read_csv("DAHWpCTC.csv")
+
+```
+
+# Labor Supply and the Child Tax Credit
+
+### Topic and Motivation
+
+I explore the trends of the adoption the Child Tax Credit and labor supply from 2005 to 2026. The Child Tax Credit is intended to ease the financial burden of families and lower the cost of raising children. Though there is ranging consensus on its effectiveness as well as the credit's impacts on labor responses within the household. Further research on the CTC may benefit to increase the credit's effectiveness and how it shapes household dynamics.
+
+Here I explore questions surrounding how do employment and labor supply responses change during the adoption and expansion of the CTC? Are these trends different among mothers who receive the credits and mothers who do not? How do these trends vary by age? race? income? and education? Additionally, I provide a causal interpretation for the analysis, considering what the effects of the CTC are on employment and labor supply responses for all recipients and working age women with children.
+
+### Data
+
+My primary data source comes from the Current Population Core Survey and Annual Social and Economic Supplement. The CPS ASEC provides longitudinal data for individuals and households. My main variables of interest including, individual employment status, labor status, and total CTC and ACTC received come from this source and are at the individual level.
+
+Additionally, I rely on posted U.S legislative policy and IRS postings to create my secondary data source. Here I collect information on federal CTC and ACTC changes including maximum credit values, minimum earnings thresholds, refundability, maximum refund values, and maximum earnings for single individual filers and married individuals filing jointly. These policy changes are implemented at the country level.
+
+Though the CTC was enacted in 1997, I restrict my analysis to the years 2005 - 2025. This is due to data availability for tracking how much an individual received from the CTC and the ACTC. Additionally, for any individuals that failed to report their earnings from the CTC or ACTC, i.e they were Not in Universe, I also excluded them from the sample. Variables including welfare income, received the earned income tax credit, and total income also had NIU/NA values, though when excluding the individuals that held NIU values for CTC or ACTC, they were excluded as well. If individuals had missing values for employment or labor status they were also excluded. These decisions were dependent on that I could not safely assume an NA/NIU value would equate to 0. This is especially the case for the credits as both individuals that qualified for the credit based on number of children and personal income and those that did not both hold NA/NIU values. Any variables that had excess missing values and were not exceedingly relevant to analysis, such as migration status 5 years ago and receiving medicare or medicaid were also excluded. The District of Columbia was excluded as well for data availability purposes.
+
+In analysis and visualizations, transformations on all incomes, total income, household income, welfare income, and adjusted gross income are applied to better capture their distribution, this also helps to for any potential analysis of elasticities. Also to capture any diminishing returns on income with age, I include an age squared term.
+
+### Visualizations
+
+#### Figure 1: Employment Trends for Women with Children, CTC vs. No CTC
+
+```{r, Figure 1, message = FALSE, warning = FALSE}
+
+dfCTC |>
+  filter(sex == 2, n_child > 0) |>
+  mutate(ctc_any = (ctc > 0 | actc > 0)) |>
+  group_by(year, ctc_any) |>
+  summarize(emp_rate = mean(employed, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = year, y = emp_rate, color = ctc_any)) +
+  geom_line(size = 1.2) +
+  labs(title = "Employment Trends for Women with Children",
+       subtitle = "By CTC/ACTC Receipt",
+       x = "Year",
+       y = "Employment Rate",
+       color = "Receives CTC") +
+  scale_color_manual(values = c("lightgreen", "red"),
+                     labels = c("Yes","No")) +
+  theme_minimal()
+
+```
+
+Figure 1 is restricted in sample to only women with children. It then charts the trends for women with children receiving the Child Tax Credit (in green) alongside women with children not receiving the Child Tax Credit (in red). The graph shows large differences in baseline employment for the two groups, though trends in their employment rate do not seem to vary drastically. There are some larger tail end differences in employment rates between the two groups, beginning around 2022.
+
+#### Figures 2 and 3: Employment and CTC Generosity; Employment and CTC Generosity for Mothers Recieving the CTC
+
+```{r, Figures 2 and 3, message = FALSE, warning = FALSE}
+
+CTCmoms = dfCTC |>
+  filter(sex == 2, n_child > 0, ctc > 0 | actc > 0)
+
+dfCTC |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot(aes(x = year)) +
+  geom_line(aes(y = emp_rate, color = "Employment Rate")) +
+  geom_line(aes(y = avg_ctc / max(avg_ctc), color = "CTC (scaled)")) +
+  labs(title = "Employment and CTC Generosity",
+       y = "Scaled Values", color = "") +
+  theme_minimal()
+#For moms receiving CTC
+CTCmoms |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot(aes(x = year)) +
+  geom_line(aes(y = emp_rate, color = "Recipient Mothers Employment Rate")) +
+  geom_line(aes(y = avg_ctc / max(avg_ctc), color = "CTC (scaled)")) +
+  labs(title = "Employment and CTC Generosity for Mothers Receiving the CTC",
+       y = "Scaled Values", color = "") +
+  theme_minimal()
+
+```
+
+Figures 2 and 3 compare employment rates to scaled changes in the maximum value of the CTC. Because values of the CTC are scaled, the figure does not discuss changes in magnitude, but trends in the two variables together. For both the entire sample and women with children recieving the CTC, employment dipped at the credit's highest generosity level. Note, the CTC was expanded the most in 2021 in response to the COVID-19 pandemic, where employment was already dipping regardless to changes in the CTC.
+
+#### Figures 4 and 5: Employment Trends Surrounding CTC Expansions; Employment Trends for Women recieving the CTC around Expansions
+
+```{r, Figures 4 and 5, message = FALSE, warning = FALSE}
+
+#Employment changes surrounding recent CTC expansions
+#For entire sample
+dfCTC |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+ggplot (aes(x = year, y = emp_rate)) +
+  geom_line() + geom_vline(aes(xintercept = 2018, color = "TCJA"),
+             linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = 2021, color = "ARPA"),
+             linetype = "dashed", size = 1) +
+   scale_color_manual(values = c("TCJA" = "darkred",
+                                "ARPA" = "lightblue"),
+                     name = "Policy Change") +
+   labs(title = "Employment Trends around CTC Expansions", 
+        y = "Employment Rate") +
+  theme_minimal() +
+  theme(legend.position = "right")
+#For mothers receiving credit
+CTCmoms |>
+  group_by(year) |>
+  summarize(
+    emp_rate = mean(employed == 1, na.rm = TRUE),
+    avg_ctc = mean(maxCTC, na.rm = TRUE)
+  ) |>
+  ggplot (aes(x = year, y = emp_rate)) +
+  geom_line() + geom_vline(aes(xintercept = 2018, color = "TCJA"),
+                           linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = 2021, color = "ARPA"),
+             linetype = "dashed", size = 1) +
+  scale_color_manual(values = c("TCJA" = "darkred",
+                                "ARPA" = "lightblue"),
+                     name = "Policy Change") +
+  labs(title = "Employment Trends for Women Receiving the CTC around Expansions", 
+       y = "Employment Rate") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+
+Figures 4 and 5 consider two major expansions to the CTC, the Tax Cuts and Jobs Act and the American Rescue Plan Act. The 2017 TCJA increased the maximum value to \$2000. The 2021 ARPA increased the maximum value to \$3,600 per child under the age of 6, and to \$3,000 for children between 6 - 17. The ARPA also made the credit fully refundable. Though, the ARPA changes only lasted throughout tax year 2021 in response to the COVID-19 pandemic. Figure 4 displays a decline in employment rates within the sample following the 2017 expansion and a rise in employment following the 2021 expansion. Conversely, Figure 5 shows an increase in employment rates following the 2017 expansion and a sharp decline in employment rates after the 2021 expansion when considering mothers receiving the CTC. Employment rates have a sharp increase around 2022, the year following expansion, in this period the expansion is no longer enacted.
+
+## Econometric Analysis
+
+### Methods
+
+My analysis is causal question asking, what is the effect of the CTC on labor supply. The question does not seek to predict how individuals change with changes to the CTC. There are many descriptive aspects to this analysis, observing employment trends and CTC trends overtime along with any correlates between the two, but the overarching question seeks to understand the effect of the CTC, making it causal. 
+
+My econometric analysis centers around the regression model,
+
+$$Y_{it} = \beta_0 + \beta_1Treatment_{it} + \beta_3X_{it} + \alpha_s + \delta_t + E_{it}$$ Where the outcome of interest, $Y_{it}$ is either a binary indicator for an individual being employed or within the labor force. Outcome specifications for the model change when considering all individuals within the sample and then considering only women aged 18 - 65.
+
+There are three treatment specifications under $Treatment_{it}$. A binary indicator for if an individual received any form of the Child Tax Credit, either through the credit or additional CTC.This captures the broad extensive margin of policy exposure, though is limited by endogeneity as the credit is dependent on income. A binary indicator for if an individual is eligible to receive the CTC. This is determined by if an individual has a child and if their total income whether married filing jointly or single filing separately is under the maximum credit threshold. This uses the exogenous variation in an individual's eligibility status, but it limited to capturing the effects of eligibility instead of the credit. And a continuous treatment measure for the total amount an individual received from the CTC and ACTC. This captures the intensive margin of policy exposure, focusing on labor supply changes in response to the size of the credit.
+
+$X{it}$ is a vector of individual characteristics including, age, race, marital status, welfare income, number of children, number of children under 5, education level, and gender. Gender is excluded when considering women between the age of 18 - 65. For the eligibility treatment, regression is ran with and without marital status and number of children.
+
+$\alpha_s$ and $\delta_t$ are state and year fixed effects All standard errors are clustered at the state level.
+
+As the CPS data are longitudinal and repeated cross sectional data, variables vary at the individual level and overtime. This is beneficial as analysis may be limited as the policy only varies at the federal level. I use two samples, using the full CPS sample and working aged women between 18 - 65.
+
+### Results
+
+```{r Regression Tables, message = FALSE, warning = FALSE}
+
+library(tidyverse)
+library(fixest)
+library(modelsummary)
+library(data.table)
+library(haven)
+library(kableExtra)
+cleanCTC = read_csv("cleanCTC.csv")
+
+regCTC = cleanCTC |>
+  mutate(
+    total_credit = ctc + actc,
+    recieved_credit = ifelse(ctc > 0 | actc > 0, 1, 0),
+    n_child = as.numeric(as.character(n_child)),
+    has_children = ifelse(n_child > 0, 1, 0),
+    log_hh_income = sign(hh_income) * log1p(abs(hh_income)),
+    log_family_income = sign(family_income) * log1p(abs(family_income)),
+    log_total_income = sign(total_income) * log1p(abs(total_income)),
+    log_welfare_income = log1p(welfare_income),
+    educ_lvl = case_when(
+      education == "No schooling" ~ 0, 
+      education == "Less than high school" ~ 1,
+      education == "High school diploma" ~ 2,
+      education == "Some college/Associate" ~ 3,
+      education == "Bachelor's degree" ~ 4,
+      education == "Graduate degree" ~ 5
+    ),
+    eligible = ifelse(
+      n_child > 0 & 
+        ((married == 0 & total_income <= max_income_single) |
+           (married == 1 & total_income <= max_income_mfj)), 1,0
+    ),
+    female = ifelse(sex == 2, 1, 0),
+    country = "US"
+  )
+
+workingwomen = regCTC |>
+  filter(female == 1, age >= 18 & age <= 65)
+
+#Binary treatment indicator: Received CTC
+#Employment Full Sample
+recieved_full_emp = feols(employed ~ recieved_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+        
+#Employment Working Women
+recieved_women_emp = feols(employed ~ recieved_credit + log_welfare_income + n_child + 
+       n_child_u5 + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+#Labor force participation full sample
+recieved_full_lf = feols(labor_force ~ recieved_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+
+#Labor force participation working women
+recieved_women_lf = feols(labor_force ~ recieved_credit + log_welfare_income + n_child + 
+       n_child_u5 + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+#Binary Indicator Treatment: Eligible for credit 
+#Eligibility is a function marital status and children
+#Employment Full Sample
+#Full controls
+eligibility_full_emp = feols(employed ~ eligible + n_child + n_child_u5 + log_welfare_income +
+        married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+
+#Employment Working Women
+#Full Controls
+eligibility_women_emp = feols(employed ~ eligible + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+#Labor force participation full sample
+#Full controls
+eligibility_full_lf = feols(labor_force ~ eligible + n_child + n_child_u5 + log_welfare_income
+     + married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+
+#Full controls
+eligibility_women_lf = feols(labor_force ~ eligible + n_child + n_child_u5 + log_welfare_income
+      + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+#Continuous treatment indicator:total credit received
+#Employment Full Sample
+cont_full_emp = feols(employed ~ total_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+
+#Employment Working Women
+cont_women_emp = feols(employed ~ total_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+#Labor force participation full sample
+cont_full_lf =feols(labor_force ~ total_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + female + educ_lvl + not_white |
+        state + year,
+      data = regCTC,
+      cluster = ~state
+)
+
+#Labor force participation working women
+cont_women_lf = feols(labor_force ~ total_credit + log_welfare_income + n_child + 
+        n_child_u5 + married + age + age^2 + educ_lvl + not_white |
+        state + year,
+      data = workingwomen,
+      cluster = ~state
+)
+
+
+models = list(
+  "(1)"  = recieved_full_emp,
+  "(2)"  = recieved_women_emp,
+  "(3)"  = recieved_full_lf,
+  "(4)"  = recieved_women_lf,
+  "(5)"  = eligibility_full_emp,
+  "(6)"  = eligibility_women_emp,
+  "(7)"  = eligibility_full_lf,
+  "(8)"  = eligibility_women_lf,
+  "(9)"  = cont_full_emp,
+  "(10)" = cont_women_emp,
+  "(11)" = cont_full_lf,
+  "(12)" = cont_women_lf
+)
+
+coef_map = c(
+  "recieved_credit"    = "Received CTC",
+  "eligible"           = "Eligible for CTC",
+  "total_credit"       = "Total CTC Amount",
+  "log_welfare_income" = "Log Welfare Income",
+  "n_child"            = "No. Children",
+  "n_child_u5"         = "No. Children Under 5",
+  "married"            = "Married",
+  "age"                = "Age",
+  "I(age^2)"           = "Age Squared",
+  "female"             = "Female",
+  "educ_lvl"           = "Education Level",
+  "not_white"          = "Non-White"
+)
+
+rows = data.frame(
+  term  = c("Sample", "State FE", "Year FE"),
+  `(1)`  = c("Full",  "Yes", "Yes"),
+  `(2)`  = c("Women", "Yes", "Yes"),
+  `(3)`  = c("Full",  "Yes", "Yes"),
+  `(4)`  = c("Women", "Yes", "Yes"),
+  `(5)`  = c("Full",  "Yes", "Yes"),
+  `(6)`  = c("Women", "Yes", "Yes"),
+  `(7)`  = c("Full",  "Yes", "Yes"),
+  `(8)`  = c("Women", "Yes", "Yes"),
+  `(9)`  = c("Full",  "Yes", "Yes"),
+  `(10)` = c("Women", "Yes", "Yes"),
+  `(11)` = c("Full",  "Yes", "Yes"),
+  `(12)` = c("Women", "Yes", "Yes"),
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+attr(rows, "position") = c(26, 27, 28)
+
+modelsummary(
+  models,
+  coef_map  = coef_map,
+  stars     = c("*" = 0.1, "**" = 0.05, "***" = 0.01),
+  gof_map   = list(
+    list(raw = "nobs",          clean = "Observations", fmt = 0),
+    list(raw = "adj.r.squared", clean = "Adj. R²",      fmt = 3)
+  ),
+  add_rows  = rows,
+  title     = "Child Tax Credit on Employment and Labor Force Participation",
+  notes     = "Clustered standard errors at the state level in parentheses. All regressions include state and year fixed effects.",
+  output    = "kableExtra",
+  escape    = FALSE
+) |>
+  # Bold the treatment variable rows
+  row_spec(c(1, 3, 5), bold = TRUE) |>
+  # Column group headers (inner: outcome + sample)
+  add_header_above(
+    c(" " = 1,
+      "Employment\nFull" = 1, "Employment\nWomen" = 1,
+      "LFP\nFull" = 1,        "LFP\nWomen" = 1,
+      "Employment\nFull" = 1, "Employment\nWomen" = 1,
+      "LFP\nFull" = 1,        "LFP\nWomen" = 1,
+      "Employment\nFull" = 1, "Employment\nWomen" = 1,
+      "LFP\nFull" = 1,        "LFP\nWomen" = 1),
+    bold = TRUE
+  ) |>
+  # Column group headers (outer: treatment)
+  add_header_above(
+    c(" " = 1,
+      "Received CTC"     = 4,
+      "Eligible for CTC" = 4,
+      "Total CTC Amount" = 4),
+    bold = TRUE, line = TRUE
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width        = TRUE,
+    font_size         = 12
+  ) |>
+  column_spec(1, bold = TRUE, width = "12em")
+
+
+```
+
+![](images/OLSFIG.png)
+
+When considering individuals that received the CTC, ceteris paribus, there is around an 11 percentage point increase in employment and labor force participation associated with receiving the CTC. For working aged women, this association is even higher. This may reflect that women who received the CTC are 12.6 percentage points more likely to be employed and 12.4 percentage points more likely to be in the labor force than women who did not receive the CTC.
+
+For the eligibility indicator, there is approximately a 5 percentage point increase in overall employment and labor force participation, and a associated 3.5 - 4 percentage point increase in employment and labor force participation for individuals that qualify for the child tax credit.
+
+For total amount of CTC received all outcomes have a very small, near zero, association with the total value of the credit received. Control variables general display expected signs consistent with economic intuition. Nonwhite is always negatively signed, individuals that are white are more likely to participate in the labor force and be employed than nonwhite individuals. Education level is always positive, there is a positive association with education on employment and labor force participation. Female is consistently negative as women are less likely to participate in the labor force than men. Age is positive while age squared is negative, capturing the nonlinear relationship between age and work, work typically increases at younger ages past 18 and decreases at older ages. Number of children under 5 is always negative, individuals with younger children are less likely to participate in the labor force than individuals with no children or individuals with older children. As displayed by number of children, which captures the effect of individuals with children over the age of 5, individuals with older children are more likely to participate in the workforce than individuals with younger children, but less likely to participate in the workforce than individuals with no children.
+
+The differences in magnitude when changing treatment specifications may suggest varying relations in the correlation between the CTC and labor force attachment. The correlation is positive and the strongest when considering individuals who received any form of the CTC, but weakest when considering the total amount of CTC. With this extensive margin being far more correlated with employment than the intensive margin, in that receiving the credit has a greater association with employment than the actual size of the credit, this may suggest there are differential effects in the type of individual receiving the credit that has a stronger correlation with employment decisions than the credit itself. When considering This story seems plausible when considering how correlations for women are consistently larger. This may be expected as labor supply decisions for women are far more sensitive to the presence of children which is the key determinant in the credit eligibility. Though, then one would expect a negative relationship between receiving the credit and credit eligibility as women with children are the most likely to receive the credit and the most constrained by the presence of children in their labor force decisions, this relationship is captured in the control variable number of children under the age of five which is consistently negative. This may also be seen when considering the sign change in the correlation between being eligible for the credit and employment when omitting marriage and number of children.
+
+When considering these results through a causal lens this would indicate that receiving the CTC increases labor supply while the amount of the credit received has no effect on labor supply. If the credit were driving labor supply decisions, instead of the credit being available to individuals with typically lower labor supplies, then it would be reasonable to expect a large effect for both credit eligibility and total credit received. This small effect in total credit received but larger effects for eligibility and receiving the credit may indicate that it is underlying characteristics within the groups that receive the credit that is driving their labor supply responses, not a causal effect of the credit. Linear OLS regression may fail to capture this relationship due to the nature of this selection bias built into the policy. Some additional concerns that may bias OLS is reverse causality, if CTC enactment or expansions are in response to a declines in parental labor force participation rates this can create a downward bias on estimates, any omitted variables or unobserved characteristics that influence receiving the CTC and labor supply, and functional form issues as labor supply responses may not be linear. Notably, while it may not be directly considered bias as OLS creates an average treatment effect, it may be misleading to include both subgroups such as males and females in the same regression due to heterogeneity in the treatment effects.
+
+I continue this causal analysis with the Gardner two stage DiD estimator, comparing women who became eligible for the credit against women who are never eligible. I focus on the indicator for individual eligibility to address any endogeneity in receiving the credit, making the assumption that people do not largely change their eligibility status in response to changes in the credit.This intention to treat approach is limited in that individuals that do not receive the credit may drive the effects, and as a binary indicator it does not capture variation in the magnitude of CTC increases.
+
+
+![](images/clipboard-241662690.png){width="437"}
+
+![](images/clipboard-2087518022.png)
+
+![](images/clipboard-1214310075.png)
+
+
+Here, I estimate the average treatment effect of becoming eligible for the CTC on employment and labor force participation for working age women. Though this does overturn some issues in causal inference from OLS, there are still many significant issues here in making causal claims. 
+
+Through a descriptive lens, when controlling for the full set of covariates, being eligible for the CTC is associated with a 15.7 pp decrease in employment and a 14.1 pp decrease in labor force participation. These correlations seem to be more in line with economic theory and predictions that tax credits, especially refundable tax credits, can discourage labor supply. In that causal lens, these results suggest that CTC eligibility reduces labor supply. This reduction is consistent when including all controls and when excluding children and marital status, as eligibility status depends on those characteristics. The results are opposite when omiting all controls. This inference is limited in that the no anticipation and parallel trends assumptions are likely to be violated. As the credit was enacted in 1997 and changes are typically announced well before the tax year, individuals can respond to increases in the CTC prior to enactment. Though, it is note worthy that changing eligibility, especially having additional children, is likely to be more costly than any additional increases. I expect women with children to vary largely from women without children even prior to becoming eligible. Women who intend to have children may have different labor supply decisions, often reducing their labor supply, than compared to women who do not intend to have children, making the parallel trends assumption unlikely.  
+
+Going forward in this analysis, I would expand the total amount of years within the data set and expand on the eligibility treatment variable. This specification would overcome the lack of data on the ACTC and CTC for years prior to 2005, and allow me to consider a period before the 1997 CTC enactment. Since there are many limitations in the eligibility treatment specification and as the parallel trends assumption seems unlikely, I would also look at different cohorts and apply varying treatment indicators. I could compare women with children above and below the income threshold in argument that they are similar in employment outcomes, but some qualify for the credit while others do not. Changing the treatment specification could also allow to control for variables such as children and marital status without worrying about collinearity, like with the eligibility indictor. 
+
