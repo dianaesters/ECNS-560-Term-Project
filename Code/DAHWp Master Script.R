@@ -461,7 +461,7 @@ cont_women_lf = feols(labor_force ~ total_credit + log_welfare_income + n_child 
                       cluster = ~state
 )
 
-#CS DiD Analysis -----------------------------
+#Gardner DiD Analysis -----------------------------
 
 #Build DiD df setup
 didCTC = regCTC |>
